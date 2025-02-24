@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather App</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+</head>
+<body>
+    <div class="card">
+        <div class="search">
+            <input type="text" id="city-input" placeholder="Enter City Name" spellcheck="false">
+            <button id="search-btn"><i class="fa fa-search"></i></button>
+        </div>
+        <div class="weather">
+            <img src="images/sun.gif" alt="weather" class="weather-icon"/>
+            <h1 class="temp">--°C</h1>
+            <h2 class="city">City</h2>
+        </div>
+        <div class="details">
+            <div class="col">
+                <img src="images/humidity.gif">
+                <p class="humidity">--%</p>
+                <p>Humidity</p>
+            </div>
+            <div class="col">
+                <img src="images/wind.gif">
+                <p class="wind">-- km/h</p>
+                <p>Wind Speed</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+async function getCoordinates(city) {
+    try {
+        const response = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1&format=json`);
+        const data = await response.json();
+        if (data.results && data.results.length > 0) {
+            return {
+                latitude: data.results[0].latitude,
+                longitude: data.results[0].longitude,
+                cityName: data.results[0].name
+            };
+        } else {
+            alert("City not found!");
+            return null;
+        }
+    } catch (error) {
+        console.error("Error fetching coordinates:", error);
+        return null;
+    }
+}
+
+async function getWeather(latitude, longitude, cityName) {
+    try {
+        const apiUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,wind_speed_10m&hourly=relative_humidity_2m`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (!data.current) {
+            console.error("Error: No current weather data available.");
+            return;
+        }
+
+        document.querySelector(".temp").innerText = `${data.current.temperature_2m}°C`;
+        document.querySelector(".city").innerText = cityName;
+        document.querySelector(".wind").innerText = `${data.current.wind_speed_10m} km/h`;
+
+        // Get current hour (0-23)
+        const currentHour = new Date().getHours();
+        const isNight = currentHour >= 18 || currentHour <= 6; // Night is from 6 PM - 6 AM
+
+        const weatherCode = data.current.weather_code;
+        const weatherIcon = document.querySelector(".weather-icon");
+
+        // Change weather icon based on weather code and time of day
+        if ([0, 1].includes(weatherCode)) {
+            weatherIcon.src = isNight ? "images/night.gif" : "images/sun.gif"; // Clear night or sunny day
+        } else if ([61, 63, 65, 80, 81, 82].includes(weatherCode)) {
+            weatherIcon.src = "images/rain.gif"; // Rainy
+        } else {
+            weatherIcon.src = "images/sun.gif"; // Default icon for unknown conditions
+        }
+
+        if (data.hourly && data.hourly.relative_humidity_2m) {
+            document.querySelector(".humidity").innerText = `${data.hourly.relative_humidity_2m[0]}%`;
+        }
+
+        document.querySelector(".weather").style.display = "block";
+
+    } catch (error) {
+        console.error("Error fetching weather data:", error);
+    }
+}
+
+document.getElementById("search-btn").addEventListener("click", async () => {
+    const city = document.getElementById("city-input").value;
+    if (city) {
+        const location = await getCoordinates(city);
+        if (location) {
+            getWeather(location.latitude, location.longitude, location.cityName);
+        }
+    }
+});
+
+    </script>
+</body>
+</html>
